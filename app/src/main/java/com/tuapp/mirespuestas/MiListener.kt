@@ -25,8 +25,6 @@ class MiListener : NotificationListenerService() {
 
     override fun onNotificationPosted(sbn: StatusBarNotification?) {
         if (sbn == null) return
-
-        // Solo Messenger
         if (sbn.packageName != "com.facebook.orca" && sbn.packageName != "com.facebook.messenger") return
 
         val p = getSharedPreferences("autoreply", Context.MODE_PRIVATE)
@@ -36,9 +34,6 @@ class MiListener : NotificationListenerService() {
         val extras = sbn.notification.extras
         val texto = extras.getCharSequence("android.text")?.toString() ?: return
         val titulo = extras.getCharSequence("android.title")?.toString() ?: ""
-
-        // No responderme a mi mismo
-        if (titulo.contains("vos", ignoreCase = true)) return
         if (texto.isBlank()) return
 
         val bienvenidaActiva = p.getBoolean("bienvenidaActiva", true)
@@ -56,8 +51,6 @@ class MiListener : NotificationListenerService() {
         }
 
         val respuestaFinal = respuestaEncontrada ?: if (bienvenidaActiva) bienvenida else return
-
-        // Guardar en borradores para que lo veas en la app
         Borradores.lista.add("De: $titulo\nMensaje: $texto\nRespuesta: $respuestaFinal")
     }
 }
