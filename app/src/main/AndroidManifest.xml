@@ -6,8 +6,11 @@
 
     <application
         android:allowBackup="true"
-        android:label="Mi Respuestas"
-        android:supportsRtl="true"
+        <application
+    android:allowBackup="true"
+    android:label="Mi Respuestas"
+    android:icon="@drawable/ic_launcher"
+    android:roundIcon="@drawable/ic_launcher"
         android:theme="@style/Theme.AppCompat.Light.NoActionBar">
 
         <activity
