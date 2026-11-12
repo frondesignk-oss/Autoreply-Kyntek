@@ -1,29 +1,33 @@
 package com.tuapp.mirespuestas
 
-data class Regla(val palabra: String, val respuestas: List<String>)
+import android.content.Context
 
 object MisDatos {
-    var bienvenida = "¡Hola! Gracias por escribirnos 😊 ¿En qué puedo ayudarte hoy?"
-    var bienvenidaActiva = true
-    val yaSaludados = mutableSetOf<String>()
-
-    var reglas = listOf(
-        Regla("precio", listOf(
-            "Nuestros precios van desde $150 hasta $500 según el modelo.",
-            "Te puedo pasar el catálogo con precios actualizados si querés.",
-            "¿Te comparto la lista con promos de este mes?"
-        )),
-        Regla("horario", listOf(
-            "Estamos de lunes a viernes de 9 a 18h.",
-            "Los findes respondemos de 10 a 14h por acá."
-        ))
+    // Tus reglas por defecto
+    var reglas: MutableList<String> = mutableListOf(
+        "precio|Cuesta \$2",
+        "cuanto|Cuesta \$2",
+        "horario|Atendemos de 9 a 18hs"
     )
 
-    fun buscarRespuesta(texto: String): String? {
-        val t = texto.lowercase()
-        for (r in reglas) {
-            if (t.contains(r.palabra)) return r.respuestas.random()
+    private const val PREFS = "mis_respuestas_prefs"
+    private const val KEY = "reglas_guardadas"
+
+    fun cargar(context: Context) {
+        val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        val guardado = prefs.getString(KEY, null)
+        if (guardado != null) {
+            // Si hay algo guardado, lo usamos. Si no, dejamos los de por defecto
+            reglas = guardado.split(";;").toMutableList()
         }
-        return null
     }
+
+    fun guardar(context: Context) {
+        val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        prefs.edit().putString(KEY, reglas.joinToString(";;")).apply()
+    }
+}
+
+object Borradores {
+    val lista = mutableListOf<String>()
 }
