@@ -25,6 +25,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var switchBienvenida: Switch
     private lateinit var txtBienvenida: EditText
     private lateinit var txtEstado: TextView
+    private var estaCargando = true
 
     private fun prefs() = getSharedPreferences("autoreply", Context.MODE_PRIVATE)
 
@@ -37,13 +38,13 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun guardar() {
+        if (estaCargando) return
         prefs().edit()
             .putBoolean("activo", switchGlobal.isChecked)
             .putBoolean("bienvenidaActiva", switchBienvenida.isChecked)
             .putString("bienvenida", txtBienvenida.text.toString())
             .putString("reglas", reglas.joinToString("##") { it.pregunta + "||" + it.respuesta })
             .apply()
-        // ESTO ERA LO QUE FALTABA - sincronizar con el Listener
         MisDatos.bienvenida = txtBienvenida.text.toString()
         MisDatos.bienvenidaActiva = switchBienvenida.isChecked
         MisDatos.activo = switchGlobal.isChecked
@@ -51,6 +52,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun cargar() {
+        estaCargando = true
         val p = prefs()
         switchGlobal.isChecked = p.getBoolean("activo", true)
         switchBienvenida.isChecked = p.getBoolean("bienvenidaActiva", true)
@@ -66,12 +68,12 @@ class MainActivity : AppCompatActivity() {
                 if (partes.size >= 2) reglas.add(ReglaMessenger(partes[0], partes[1]))
             }
         }
-        // Y ACA TAMBIEN - al abrir, pasar lo guardado a MisDatos
         MisDatos.bienvenida = txtBienvenida.text.toString()
         MisDatos.bienvenidaActiva = switchBienvenida.isChecked
         MisDatos.activo = switchGlobal.isChecked
         MisDatos.reglas = reglas.toMutableList()
         actualizarEstado()
+        estaCargando = false
     }
 
     private fun actualizarEstado() {
@@ -221,8 +223,6 @@ class MainActivity : AppCompatActivity() {
         }
         btnGuardar.setOnClickListener { guardar(); Toast.makeText(this, "Guardado", Toast.LENGTH_SHORT).show() }
         layout.addView(btnGuardar)
-        switchGlobal.setOnCheckedChangeListener { _, _ -> guardar(); actualizarEstado() }
-        switchBienvenida.setOnCheckedChangeListener { _, _ -> guardar() }
         layout.addView(TextView(this).apply {
             text = "Respuestas para Messenger"
             textSize = 22f
@@ -258,5 +258,7 @@ class MainActivity : AppCompatActivity() {
         setContentView(scroll)
         cargar()
         render()
+        switchGlobal.setOnCheckedChangeListener { _, _ -> guardar(); actualizarEstado() }
+        switchBienvenida.setOnCheckedChangeListener { _, _ -> guardar() }
     }
 }
