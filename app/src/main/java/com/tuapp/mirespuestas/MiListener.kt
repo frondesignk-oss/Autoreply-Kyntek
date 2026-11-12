@@ -6,67 +6,58 @@ import android.service.notification.StatusBarNotification
 
 class MiListener : NotificationListenerService() {
 
+    private fun cargarReglas(): List<ReglaMessenger> {
+        val p = getSharedPreferences("autoreply", Context.MODE_PRIVATE)
+        val g = p.getString("reglas", "")
+        if (g.isNullOrEmpty()) {
+            return listOf(
+                ReglaMessenger("precio", "Cuesta \$2"),
+                ReglaMessenger("horario", "Estamos de lunes a viernes de 9:00 a 18:00 h.")
+            )
+        }
+        val lista = mutableListOf<ReglaMessenger>()
+        g.split("##").forEach {
+            val partes = it.split("||")
+            if (partes.size >= 2) lista.add(ReglaMessenger(partes[0], partes[1]))
+        }
+        return lista
+    }
+
     override fun onNotificationPosted(sbn: StatusBarNotification?) {
         if (sbn == null) return
 
-        // SOLO MESSENGER DE FACEBOOK
-        if (sbn.packageName != "com.facebook.orca") return
+        // Solo Messenger
+        if (sbn.packageName != "com.facebook.orca" && sbn.packageName != "com.facebook.messenger") return
 
-        val prefs = getSharedPreferences("autoreply", Context.MODE_PRIVATE)
-        if (!prefs.getBoolean("activo", true)) return
+        val p = getSharedPreferences("autoreply", Context.MODE_PRIVATE)
+        val activo = p.getBoolean("activo", true)
+        if (!activo) return
 
         val extras = sbn.notification.extras
-        val titulo = extras.getString("android.title") ?: return
-        val mensaje = extras.getString("android.text") ?: return
+        val texto = extras.getCharSequence("android.text")?.toString() ?: return
+        val titulo = extras.getCharSequence("android.title")?.toString() ?: ""
 
-        // Evita responderte a vos mismo o notificaciones del sistema
-        if (titulo.equals("Messenger", true)) return
-        if (mensaje.isBlank()) return
+        // No responderme a mi mismo
+        if (titulo.contains("vos", ignoreCase = true)) return
+        if (texto.isBlank()) return
 
-        val mensajeMinus = mensaje.lowercase()
-        val reglasTexto = prefs.getString("reglas", "") ?: ""
-        val bienvenidaActiva = prefs.getBoolean("bienvenidaActiva", true)
-        val bienvenida = prefs.getString("bienvenida", MisDatos.bienvenida) ?: MisDatos.bienvenida
+        val bienvenidaActiva = p.getBoolean("bienvenidaActiva", true)
+        val bienvenida = p.getString("bienvenida", "Hola! Gracias por escribirnos. ¿En qué te ayudamos?") ?: ""
 
-        // 1. Buscar si el mensaje tiene alguna palabra clave
+        val reglas = cargarReglas()
+        val textoLower = texto.lowercase()
+
         var respuestaEncontrada: String? = null
-        var preguntaEncontrada = ""
-
-        if (reglasTexto.isNotEmpty()) {
-            reglasTexto.split("##").forEach {
-                val partes = it.split("||")
-                if (partes.size >= 2) {
-                    val pregunta = partes[0].trim().lowercase()
-                    val respuesta = partes[1].trim()
-                    if (pregunta.isNotEmpty() && mensajeMinus.contains(pregunta)) {
-                        respuestaEncontrada = respuesta
-                        preguntaEncontrada = partes[0]
-                    }
-                }
+        for (regla in reglas) {
+            if (textoLower.contains(regla.pregunta.lowercase())) {
+                respuestaEncontrada = regla.respuesta
+                break
             }
         }
 
-        // 2. Si encontró una pregunta, preparar el borrador
-        if (respuestaEncontrada != null) {
-            val borrador = "De: $titulo\n" +
-                    "Te escribió: \"$mensaje\"\n" +
-                    "Detectó: $preguntaEncontrada\n" +
-                    "Respuesta lista: $respuestaEncontrada"
-            // No duplicar el mismo borrador
-            if (!Borradores.lista.contains(borrador)) {
-                Borradores.lista.add(0, borrador)
-            }
-            return
-        }
+        val respuestaFinal = respuestaEncontrada ?: if (bienvenidaActiva) bienvenida else return
 
-        // 3. Si no encontró pregunta, pero es la primera vez, preparar bienvenida
-        if (bienvenidaActiva && bienvenida.isNotBlank()) {
-            val borradorBienvenida = "De: $titulo\n" +
-                    "Te escribió: \"$mensaje\"\n" +
-                    "Respuesta lista (bienvenida): $bienvenida"
-            if (!Borradores.lista.contains(borradorBienvenida)) {
-                Borradores.lista.add(0, borradorBienvenida)
-            }
-        }
+        // Guardar en borradores para que lo veas en la app
+        Borradores.lista.add("De: $titulo\nMensaje: $texto\nRespuesta: $respuestaFinal")
     }
 }
