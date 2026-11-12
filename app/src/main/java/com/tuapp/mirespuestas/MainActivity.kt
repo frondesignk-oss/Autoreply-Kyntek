@@ -17,8 +17,6 @@ import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 
-data class ReglaMessenger(val pregunta: String, var respuesta: String)
-
 class MainActivity : AppCompatActivity() {
 
     private val reglas = mutableListOf<ReglaMessenger>()
@@ -45,7 +43,11 @@ class MainActivity : AppCompatActivity() {
             .putString("bienvenida", txtBienvenida.text.toString())
             .putString("reglas", reglas.joinToString("##") { it.pregunta + "||" + it.respuesta })
             .apply()
+        // ESTO ERA LO QUE FALTABA - sincronizar con el Listener
         MisDatos.bienvenida = txtBienvenida.text.toString()
+        MisDatos.bienvenidaActiva = switchBienvenida.isChecked
+        MisDatos.activo = switchGlobal.isChecked
+        MisDatos.reglas = reglas.toMutableList()
     }
 
     private fun cargar() {
@@ -64,6 +66,11 @@ class MainActivity : AppCompatActivity() {
                 if (partes.size >= 2) reglas.add(ReglaMessenger(partes[0], partes[1]))
             }
         }
+        // Y ACA TAMBIEN - al abrir, pasar lo guardado a MisDatos
+        MisDatos.bienvenida = txtBienvenida.text.toString()
+        MisDatos.bienvenidaActiva = switchBienvenida.isChecked
+        MisDatos.activo = switchGlobal.isChecked
+        MisDatos.reglas = reglas.toMutableList()
         actualizarEstado()
     }
 
