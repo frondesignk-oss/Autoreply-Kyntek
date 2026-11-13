@@ -263,7 +263,10 @@ class MainActivity : AppCompatActivity() {
             setBackground(redondo(Color.parseColor("#E0E0E0"), 40f))
             setTextColor(Color.BLACK)
         }
-        btnVer.setOnClickListener { lista.text = Borradores.lista.joinToString("\n\n") }
+        btnVer.setOnClickListener {
+    val guardados = getSharedPreferences("autoreply", Context.MODE_PRIVATE).getString("borradores_guardados", "")
+    lista.text = if (!guardados.isNullOrEmpty()) guardados else Borradores.lista.joinToString("\n\n")
+}
         layout.addView(btnVer)
         layout.addView(lista)
         scroll.addView(layout)
