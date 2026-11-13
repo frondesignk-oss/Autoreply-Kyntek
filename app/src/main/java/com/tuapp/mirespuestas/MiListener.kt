@@ -7,10 +7,13 @@ import android.content.Context
 import android.content.Intent
 import android.os.Build
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.service.notification.NotificationListenerService
 import android.service.notification.StatusBarNotification
 import androidx.core.app.NotificationCompat
 import androidx.core.app.RemoteInput
+import kotlin.random.Random
 
 class MiListener : NotificationListenerService() {
 
@@ -32,8 +35,8 @@ class MiListener : NotificationListenerService() {
         val pending = PendingIntent.getActivity(this, 0, intentApp, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
         val noti = NotificationCompat.Builder(this, channelId)
             .setSmallIcon(android.R.drawable.ic_dialog_info)
-            .setContentTitle("Respondí mensaje a $nombre")
-            .setContentText("Respondí mensaje a $nombre")
+            .setContentTitle("Respondí mensaje a " + nombre)
+            .setContentText("Respondí mensaje a " + nombre)
             .setContentIntent(pending)
             .setAutoCancel(true)
             .setPriority(NotificationCompat.PRIORITY_HIGH)
@@ -81,62 +84,69 @@ class MiListener : NotificationListenerService() {
         }
         if (respuestaFinal == null) return
 
-        guardar("De: $titulo\nMensaje: $texto\nRespuesta: $respuestaFinal")
+        guardar("De: " + titulo + "\nMensaje: " + texto + "\nRespuesta: " + respuestaFinal)
 
-        try {
-            val wearable = NotificationCompat.WearableExtender(sbn.notification)
-            val todasAcciones = mutableListOf<NotificationCompat.Action>()
-            // Primero las normales, después las wearable. Las normales son las que Messenger realmente usa
-            for (i in 0 until NotificationCompat.getActionCount(sbn.notification)) {
-                NotificationCompat.getAction(sbn.notification, i)?.let { todasAcciones.add(it) }
-            }
-            todasAcciones.addAll(wearable.actions)
+        // DELAY RANDOM 10 a 30 segundos para parecer humano
+        val delay = Random.nextLong(5000, 8001)
+        guardar("DEBUG: Espero " + (delay / 1000) + " seg antes de responder a " + titulo)
 
-            guardar("DEBUG: Encontre ${todasAcciones.size} acciones")
+        val respuestaParaEnviar = respuestaFinal
+        val tituloParaEnviar = titulo
+        val keyParaBorrar = sbn.key
+        val notificacionOriginal = sbn.notification
 
-            // Ordenar: primero la que dice Responder / Reply
-            val ordenadas = todasAcciones.sortedByDescending {
-                val t = it.title?.toString()?.lowercase() ?: ""
-                if (t.contains("responder") || t.contains("reply")) 1 else 0
-            }
-
-            for (action in ordenadas) {
-                val inputs = action.remoteInputs ?: continue
-                if (inputs.isEmpty()) continue
-
-                guardar("DEBUG: Intento responder con accion: ${action.title}")
-
-                // NO reconstruir. Usar los RemoteInput originales tal cual vienen de Messenger
-                val nativeInputs = inputs.map { compatInput ->
-                    val builder = android.app.RemoteInput.Builder(compatInput.resultKey)
-                        .setLabel(compatInput.label)
-                        .setAllowFreeFormInput(compatInput.allowFreeFormInput)
-                    compatInput.choices?.let { builder.setChoices(it) }
-                    builder.addExtras(compatInput.extras)
-                    builder.build()
-                }.toTypedArray()
-
-                val intent = Intent()
-                val bundle = Bundle()
-                for (ri in nativeInputs) {
-                    bundle.putCharSequence(ri.resultKey, respuestaFinal)
+        Handler(Looper.getMainLooper()).postDelayed({
+            try {
+                val wearable = NotificationCompat.WearableExtender(notificacionOriginal)
+                val todasAcciones = mutableListOf<NotificationCompat.Action>()
+                for (i in 0 until NotificationCompat.getActionCount(notificacionOriginal)) {
+                    NotificationCompat.getAction(notificacionOriginal, i)?.let { todasAcciones.add(it) }
                 }
-                android.app.RemoteInput.addResultsToIntent(nativeInputs, intent, bundle)
+                todasAcciones.addAll(wearable.actions)
 
-                try {
-                    action.actionIntent?.send(this, 0, intent)
-                    guardar("DEBUG: ENVIADO OK a $titulo con accion ${action.title}")
-                    mostrarAviso(titulo)
-                    // Esperar un poquito y cancelar la notificación para que no se reintente
-                    try { cancelNotification(sbn.key) } catch (e: Exception) {}
-                    return
-                } catch (e: Exception) {
-                    guardar("DEBUG ERROR SEND 2: ${e.message}")
+                guardar("DEBUG: Encontre " + todasAcciones.size + " acciones")
+
+                val ordenadas = todasAcciones.sortedByDescending {
+                    val t = it.title?.toString()?.lowercase() ?: ""
+                    if (t.contains("responder") || t.contains("reply")) 1 else 0
                 }
+
+                for (action in ordenadas) {
+                    val inputs = action.remoteInputs ?: continue
+                    if (inputs.isEmpty()) continue
+
+                    guardar("DEBUG: Intento responder con accion: " + action.title)
+
+                    val nativeInputs = inputs.map { compatInput ->
+                        val builder = android.app.RemoteInput.Builder(compatInput.resultKey)
+                            .setLabel(compatInput.label)
+                            .setAllowFreeFormInput(compatInput.allowFreeFormInput)
+                        compatInput.choices?.let { builder.setChoices(it) }
+                        builder.addExtras(compatInput.extras)
+                        builder.build()
+                    }.toTypedArray()
+
+                    val intent = Intent()
+                    val bundle = Bundle()
+                    for (ri in nativeInputs) {
+                        bundle.putCharSequence(ri.resultKey, respuestaParaEnviar)
+                    }
+                    android.app.RemoteInput.addResultsToIntent(nativeInputs, intent, bundle)
+
+                    try {
+                        action.actionIntent?.send(this, 0, intent)
+                        guardar("DEBUG: ENVIADO OK a " + tituloParaEnviar + " con accion " + action.title)
+                        mostrarAviso(tituloParaEnviar)
+                        try { cancelNotification(keyParaBorrar) } catch (e: Exception) {}
+                        return@postDelayed
+                    } catch (e: Exception) {
+                        guardar("DEBUG ERROR SEND 2: " + e.message)
+                    }
+                }
+                guardar("DEBUG: No encontre ninguna accion con RemoteInput.")
+            } catch (e: Exception) {
+                guardar("DEBUG ERROR AL ENVIAR: " + e.message)
             }
-            guardar("DEBUG: No encontre ninguna accion con RemoteInput.")
-        } catch (e: Exception) {
-            guardar("DEBUG ERROR AL ENVIAR: ${e.message}")
-        }
+        }, delay)
     }
 }
