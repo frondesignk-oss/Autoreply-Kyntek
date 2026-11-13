@@ -1,5 +1,6 @@
 package com.tuapp.mirespuestas
-
+import androidx.core.app.RemoteInput
+import android.app.RemoteInput as NativeRemoteInput
 import androidx.core.app.RemoteInput
 import android.content.Context
 import android.content.Intent
@@ -78,15 +79,24 @@ class MiListener : NotificationListenerService() {
 
                 guardar("DEBUG: Intento responder con accion: ${action.title}")
 
-                val intent = Intent()
-                val bundle = Bundle()
-                for (ri in inputs) {
-                    bundle.putCharSequence(ri.resultKey, respuestaFinal)
-                }
-                // ESTA ES LA LINEA CLAVE - con android.app.RemoteInput, no con el de androidx
-                RemoteInput.addResultsToIntent(inputs, intent, bundle)
+              // Usar RemoteInput NATIVO, no el de androidx
+val nativeInputs = inputs.map { 
+    android.app.RemoteInput.Builder(it.resultKey).build() 
+}.toTypedArray()
 
-                action.actionIntent?.send(this, 0, intent)
+val intent = Intent()
+val bundle = Bundle()
+for (ri in nativeInputs) {
+    bundle.putCharSequence(ri.resultKey, respuestaFinal)
+}
+android.app.RemoteInput.addResultsToIntent(nativeInputs, intent, bundle)
+
+// Esto es clave: hay que mandarlo como fillInIntent del PendingIntent
+try {
+    action.actionIntent?.send(this, 0, intent)
+} catch (e: Exception) {
+    guardar("DEBUG ERROR SEND 2: ${e.message}")
+}
                 guardar("DEBUG: ENVIADO OK a $titulo")
                 return
             }
