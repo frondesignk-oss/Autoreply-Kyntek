@@ -1,11 +1,12 @@
 package com.tuapp.mirespuestas
-import androidx.core.app.RemoteInput
+
 import android.content.Context
 import android.content.Intent
 import android.os.Bundle
 import android.service.notification.NotificationListenerService
 import android.service.notification.StatusBarNotification
 import androidx.core.app.NotificationCompat
+import androidx.core.app.RemoteInput
 
 class MiListener : NotificationListenerService() {
 
@@ -36,10 +37,9 @@ class MiListener : NotificationListenerService() {
         val texto = extras.getCharSequence("android.text")?.toString() ?: ""
         val titulo = extras.getCharSequence("android.title")?.toString() ?: ""
 
-        // 1. FILTROS QUE FALTABAN
         if (texto.isBlank()) return
         if (sbn.isOngoing) return
-        if (titulo == "Messenger") return // es el "Buscando mensajes nuevos"
+        if (titulo == "Messenger") return
         if (texto.contains("Buscando mensajes", ignoreCase = true)) return
         if (texto.contains("mensajes nuevos", ignoreCase = true)) return
 
@@ -59,12 +59,10 @@ class MiListener : NotificationListenerService() {
 
         guardar("De: $titulo\nMensaje: $texto\nRespuesta: $respuestaFinal")
 
-        // 2. BUSCAR LA ACCION DE RESPONDER DE MESSENGER
         try {
             val wearable = NotificationCompat.WearableExtender(sbn.notification)
             val todasAcciones = mutableListOf<NotificationCompat.Action>()
             todasAcciones.addAll(wearable.actions)
-            // Tambien las acciones normales
             for (i in 0 until NotificationCompat.getActionCount(sbn.notification)) {
                 NotificationCompat.getAction(sbn.notification, i)?.let { todasAcciones.add(it) }
             }
@@ -77,24 +75,28 @@ class MiListener : NotificationListenerService() {
 
                 guardar("DEBUG: Intento responder con accion: ${action.title}")
 
-// Usar RemoteInput NATIVO, con nombre completo para no confundir
-val nativeInputs = inputs.map {
-    android.app.RemoteInput.Builder(it.resultKey).build()
-}.toTypedArray()
+                val nativeInputs = inputs.map {
+                    android.app.RemoteInput.Builder(it.resultKey).build()
+                }.toTypedArray()
 
-val intent = Intent()
-val bundle = Bundle()
-for (ri in nativeInputs) {
-    bundle.putCharSequence(ri.resultKey, respuestaFinal)
-}
-android.app.RemoteInput.addResultsToIntent(nativeInputs, intent, bundle)
+                val intent = Intent()
+                val bundle = Bundle()
+                for (ri in nativeInputs) {
+                    bundle.putCharSequence(ri.resultKey, respuestaFinal)
+                }
+                android.app.RemoteInput.addResultsToIntent(nativeInputs, intent, bundle)
 
-try {
-    action.actionIntent?.send(this, 0, intent)
-    guardar("DEBUG: ENVIADO OK a $titulo")
-    return
-} catch (e: Exception) {
-    guardar("DEBUG ERROR SEND 2: ${e.message}")
-}
+                try {
+                    action.actionIntent?.send(this, 0, intent)
+                    guardar("DEBUG: ENVIADO OK a $titulo")
+                    return
+                } catch (e: Exception) {
+                    guardar("DEBUG ERROR SEND 2: ${e.message}")
+                }
+            }
+            guardar("DEBUG: No encontre ninguna accion con RemoteInput.")
+        } catch (e: Exception) {
+            guardar("DEBUG ERROR AL ENVIAR: ${e.message}")
+        }
     }
 }
