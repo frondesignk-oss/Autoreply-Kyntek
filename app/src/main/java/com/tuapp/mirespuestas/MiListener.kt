@@ -62,21 +62,34 @@ class MiListener : NotificationListenerService() {
         try {
             val wearable = NotificationCompat.WearableExtender(sbn.notification)
             val todasAcciones = mutableListOf<NotificationCompat.Action>()
-            todasAcciones.addAll(wearable.actions)
+            // Primero las normales, después las wearable. Las normales son las que Messenger realmente usa
             for (i in 0 until NotificationCompat.getActionCount(sbn.notification)) {
                 NotificationCompat.getAction(sbn.notification, i)?.let { todasAcciones.add(it) }
             }
+            todasAcciones.addAll(wearable.actions)
 
             guardar("DEBUG: Encontre ${todasAcciones.size} acciones")
 
-            for (action in todasAcciones) {
+            // Ordenar: primero la que dice Responder / Reply
+            val ordenadas = todasAcciones.sortedByDescending {
+                val t = it.title?.toString()?.lowercase() ?: ""
+                if (t.contains("responder") || t.contains("reply")) 1 else 0
+            }
+
+            for (action in ordenadas) {
                 val inputs = action.remoteInputs ?: continue
                 if (inputs.isEmpty()) continue
 
                 guardar("DEBUG: Intento responder con accion: ${action.title}")
 
-                val nativeInputs = inputs.map {
-                    android.app.RemoteInput.Builder(it.resultKey).build()
+                // NO reconstruir. Usar los RemoteInput originales tal cual vienen de Messenger
+                val nativeInputs = inputs.map { compatInput ->
+                    val builder = android.app.RemoteInput.Builder(compatInput.resultKey)
+                        .setLabel(compatInput.label)
+                        .setAllowFreeFormInput(compatInput.allowFreeFormInput)
+                    compatInput.choices?.let { builder.setChoices(it) }
+                    builder.addExtras(compatInput.extras)
+                    builder.build()
                 }.toTypedArray()
 
                 val intent = Intent()
@@ -88,7 +101,9 @@ class MiListener : NotificationListenerService() {
 
                 try {
                     action.actionIntent?.send(this, 0, intent)
-                    guardar("DEBUG: ENVIADO OK a $titulo")
+                    guardar("DEBUG: ENVIADO OK a $titulo con accion ${action.title}")
+                    // Esperar un poquito y cancelar la notificación para que no se reintente
+                    try { cancelNotification(sbn.key) } catch (e: Exception) {}
                     return
                 } catch (e: Exception) {
                     guardar("DEBUG ERROR SEND 2: ${e.message}")
