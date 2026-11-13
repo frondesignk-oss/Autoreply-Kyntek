@@ -1,6 +1,6 @@
 package com.tuapp.mirespuestas
 
-import android.app.RemoteInput
+import androidx.core.app.RemoteInput
 import android.content.Context
 import android.content.Intent
 import android.os.Bundle
