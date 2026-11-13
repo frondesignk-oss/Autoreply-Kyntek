@@ -1,7 +1,5 @@
 package com.tuapp.mirespuestas
 import androidx.core.app.RemoteInput
-import android.app.RemoteInput as NativeRemoteInput
-import androidx.core.app.RemoteInput
 import android.content.Context
 import android.content.Intent
 import android.os.Bundle
@@ -79,9 +77,9 @@ class MiListener : NotificationListenerService() {
 
                 guardar("DEBUG: Intento responder con accion: ${action.title}")
 
-              // Usar RemoteInput NATIVO, no el de androidx
-val nativeInputs = inputs.map { 
-    android.app.RemoteInput.Builder(it.resultKey).build() 
+// Usar RemoteInput NATIVO, con nombre completo para no confundir
+val nativeInputs = inputs.map {
+    android.app.RemoteInput.Builder(it.resultKey).build()
 }.toTypedArray()
 
 val intent = Intent()
@@ -91,18 +89,12 @@ for (ri in nativeInputs) {
 }
 android.app.RemoteInput.addResultsToIntent(nativeInputs, intent, bundle)
 
-// Esto es clave: hay que mandarlo como fillInIntent del PendingIntent
 try {
     action.actionIntent?.send(this, 0, intent)
+    guardar("DEBUG: ENVIADO OK a $titulo")
+    return
 } catch (e: Exception) {
     guardar("DEBUG ERROR SEND 2: ${e.message}")
 }
-                guardar("DEBUG: ENVIADO OK a $titulo")
-                return
-            }
-            guardar("DEBUG: No encontre ninguna accion con RemoteInput. Messenger no deja responder desde notificacion.")
-        } catch (e: Exception) {
-            guardar("DEBUG ERROR AL ENVIAR: ${e.message}")
-        }
     }
 }
