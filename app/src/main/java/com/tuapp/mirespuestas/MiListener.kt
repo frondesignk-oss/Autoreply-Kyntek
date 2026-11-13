@@ -1,7 +1,11 @@
 package com.tuapp.mirespuestas
 
+import android.app.NotificationChannel
+import android.app.NotificationManager
+import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
+import android.os.Build
 import android.os.Bundle
 import android.service.notification.NotificationListenerService
 import android.service.notification.StatusBarNotification
@@ -15,6 +19,26 @@ class MiListener : NotificationListenerService() {
         val anterior = p.getString("borradores_guardados", "") ?: ""
         p.edit().putString("borradores_guardados", (texto + "\n\n" + anterior).take(5000)).apply()
         Borradores.lista.add(texto)
+    }
+
+    private fun mostrarAviso(nombre: String) {
+        val manager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        val channelId = "kyntek_avisos"
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val channel = NotificationChannel(channelId, "Kyntek Reply", NotificationManager.IMPORTANCE_HIGH)
+            manager.createNotificationChannel(channel)
+        }
+        val intentApp = Intent(this, MainActivity::class.java)
+        val pending = PendingIntent.getActivity(this, 0, intentApp, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
+        val noti = NotificationCompat.Builder(this, channelId)
+            .setSmallIcon(android.R.drawable.ic_dialog_info)
+            .setContentTitle("Respondí mensaje a $nombre")
+            .setContentText("Respondí mensaje a $nombre")
+            .setContentIntent(pending)
+            .setAutoCancel(true)
+            .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .build()
+        manager.notify(System.currentTimeMillis().toInt(), noti)
     }
 
     private fun cargarReglas(): List<ReglaMessenger> {
@@ -102,6 +126,7 @@ class MiListener : NotificationListenerService() {
                 try {
                     action.actionIntent?.send(this, 0, intent)
                     guardar("DEBUG: ENVIADO OK a $titulo con accion ${action.title}")
+                    mostrarAviso(titulo)
                     // Esperar un poquito y cancelar la notificación para que no se reintente
                     try { cancelNotification(sbn.key) } catch (e: Exception) {}
                     return
