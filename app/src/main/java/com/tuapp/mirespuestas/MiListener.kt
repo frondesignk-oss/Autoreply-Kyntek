@@ -77,7 +77,16 @@ class MiListener : NotificationListenerService() {
         val textoLower = texto.lowercase()
         var respuestaFinal: String? = null
         for (regla in reglas) {
-            if (textoLower.contains(regla.pregunta.lowercase())) {
+            val palabras = regla.pregunta.split(",")
+            var encontro = false
+            for (pal in palabras) {
+                val p = pal.trim().lowercase()
+                if (p.isNotEmpty() && textoLower.contains(p)) {
+                    encontro = true
+                    break
+                }
+            }
+            if (encontro) {
                 respuestaFinal = regla.respuesta
                 break
             }
