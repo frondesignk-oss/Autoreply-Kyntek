@@ -1,12 +1,12 @@
 package com.tuapp.mirespuestas
 
-import android.app.RemoteInput
 import android.content.Context
 import android.content.Intent
 import android.os.Bundle
 import android.service.notification.NotificationListenerService
 import android.service.notification.StatusBarNotification
 import androidx.core.app.NotificationCompat
+import androidx.core.app.RemoteInput
 
 class MiListener : NotificationListenerService() {
 
@@ -40,7 +40,6 @@ class MiListener : NotificationListenerService() {
         if (texto.isBlank()) return
         if (sbn.isOngoing) return
 
-        // Evitar responder 2 veces el mismo mensaje
         val clave = sbn.key + "|" + texto
         val ultimo = p.getString("ultimo_procesado", "")
         if (clave == ultimo) return
@@ -60,23 +59,35 @@ class MiListener : NotificationListenerService() {
         }
         val respuestaFinal = respuestaEncontrada ?: if (bienvenidaActiva) bienvenida else return
 
-        // Guardar en prefs para que VER BORRADORES lo muestre aunque cierres la app
         val anterior = p.getString("borradores_guardados", "")
         val nuevo = "De: ${extras.getCharSequence("android.title")}\nMensaje: $texto\nRespuesta: $respuestaFinal"
         p.edit().putString("borradores_guardados", (nuevo + "\n\n" + anterior).take(4000)).apply()
         Borradores.lista.add(nuevo)
 
-        // 1. Buscar en acciones normales
-        // 2. Buscar en WearableExtender, que es donde Messenger esconde el Responder
         try {
             val listaAcciones = mutableListOf<NotificationCompat.Action>()
 
-            notification.actions?.forEach {
-                listaAcciones.add(NotificationCompat.Action(it.icon, it.title, it.actionIntent))
-            }
-
+            // Acciones normales
+            val compatNotif = NotificationCompat.Builder(this, "default").build()
+            // Usamos el WearableExtender que es donde Messenger esconde el Responder
             val wearable = NotificationCompat.WearableExtender(notification)
             listaAcciones.addAll(wearable.actions)
+
+            // También las acciones directas, por las dudas
+            notification.actions?.forEach { act ->
+                // Convertir la acción de Android a la de Compat para usar el mismo RemoteInput
+                val riArray = act.remoteInputs
+                if (riArray != null) {
+                    val compatInputs = riArray.map { r ->
+                        RemoteInput.Builder(r.resultKey).build()
+                    }.toTypedArray()
+                    listaAcciones.add(
+                        NotificationCompat.Action.Builder(0, act.title, act.actionIntent)
+                            .addRemoteInput(compatInputs[0])
+                            .build()
+                    )
+                }
+            }
 
             for (action in listaAcciones) {
                 val remoteInputs = action.remoteInputs ?: continue
