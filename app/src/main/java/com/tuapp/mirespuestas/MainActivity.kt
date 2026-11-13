@@ -6,6 +6,8 @@ import android.graphics.Color
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
 import android.os.Bundle
+import android.text.Editable
+import android.text.TextWatcher
 import android.view.Gravity
 import android.view.ViewGroup
 import android.widget.Button
@@ -39,16 +41,26 @@ class MainActivity : AppCompatActivity() {
 
     private fun guardar() {
         if (estaCargando) return
+        // commit() en vez de apply() = guarda YA, no cuando Android quiera
         prefs().edit()
             .putBoolean("activo", switchGlobal.isChecked)
             .putBoolean("bienvenidaActiva", switchBienvenida.isChecked)
             .putString("bienvenida", txtBienvenida.text.toString())
             .putString("reglas", reglas.joinToString("##") { it.pregunta + "||" + it.respuesta })
-            .apply()
+            .commit()
         MisDatos.bienvenida = txtBienvenida.text.toString()
         MisDatos.bienvenidaActiva = switchBienvenida.isChecked
         MisDatos.activo = switchGlobal.isChecked
         MisDatos.reglas = reglas.toMutableList()
+    }
+
+    // ESTO ES LO NUEVO: guarda aunque cierres sin apretar nada
+    override fun onPause() {
+        super.onPause()
+        val estaba = estaCargando
+        estaCargando = false
+        guardar()
+        estaCargando = estaba
     }
 
     private fun cargar() {
@@ -260,5 +272,11 @@ class MainActivity : AppCompatActivity() {
         render()
         switchGlobal.setOnCheckedChangeListener { _, _ -> guardar(); actualizarEstado() }
         switchBienvenida.setOnCheckedChangeListener { _, _ -> guardar() }
+        // Guarda solo mientras escribis la bienvenida, sin apretar boton
+        txtBienvenida.addTextChangedListener(object : TextWatcher {
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
+            override fun afterTextChanged(s: Editable?) { guardar() }
+        })
     }
 }
