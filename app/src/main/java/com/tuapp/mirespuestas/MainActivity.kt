@@ -70,7 +70,7 @@ class MainActivity : AppCompatActivity() {
         reglas.clear()
         val g = p.getString("reglas", "")
         if (g.isNullOrEmpty()) {
-            reglas.add(ReglaMessenger("precio", "Cuesta \$2"))
+            reglas.add(ReglaMessenger("precio", "Cuesta 2 pesos"))
             reglas.add(ReglaMessenger("horario", "Estamos de lunes a viernes de 9:00 a 18:00 h."))
         } else {
             g.split("##").forEach {
@@ -113,7 +113,7 @@ class MainActivity : AppCompatActivity() {
                 setPadding(28, 16, 28, 16)
             }
             val resp = TextView(this).apply {
-                text = "💬  ${regla.respuesta}"
+                text = "💬  " + regla.respuesta
                 textSize = 15f
                 setPadding(0, 20, 0, 20)
             }
@@ -147,7 +147,7 @@ class MainActivity : AppCompatActivity() {
     private fun mostrarDialogoNueva() {
         val lay = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(40, 20, 40, 20) }
         val etP = EditText(this).apply { hint = "Ej: precio" }
-        val etR = EditText(this).apply { hint = "Ej: Cuesta \$2" }
+        val etR = EditText(this).apply { hint = "Ej: Cuesta 2 pesos" }
         lay.addView(TextView(this).apply { text = "Palabra que detecta en Messenger:" })
         lay.addView(etP)
         lay.addView(TextView(this).apply { text = "Respuesta que prepara:" })
@@ -170,7 +170,7 @@ class MainActivity : AppCompatActivity() {
     private fun mostrarDialogoEditar(index: Int) {
         val et = EditText(this).apply { setText(reglas[index].respuesta) }
         AlertDialog.Builder(this)
-            .setTitle("Editar: ${reglas[index].pregunta}")
+            .setTitle("Editar: " + reglas[index].pregunta)
             .setView(et)
             .setPositiveButton("Guardar") { _, _ ->
                 reglas[index].respuesta = et.text.toString()
@@ -250,4 +250,21 @@ class MainActivity : AppCompatActivity() {
         val btnAgregar = Button(this).apply {
             text = "+  Agregar nueva respuesta"
             textSize = 18f
-            set
+            setBackground(redondo(Color.parseColor("#0F9D6A"), 50f))
+            setTextColor(Color.WHITE)
+        }
+        btnAgregar.setOnClickListener { mostrarDialogoNueva() }
+        layout.addView(btnAgregar)
+        scroll.addView(layout)
+        setContentView(scroll)
+        cargar()
+        render()
+        switchGlobal.setOnCheckedChangeListener { _, _ -> guardar(); actualizarEstado() }
+        switchBienvenida.setOnCheckedChangeListener { _, _ -> guardar() }
+        txtBienvenida.addTextChangedListener(object : TextWatcher {
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
+            override fun afterTextChanged(s: Editable?) { guardar() }
+        })
+    }
+}
