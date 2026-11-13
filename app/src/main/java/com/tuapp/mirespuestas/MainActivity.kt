@@ -41,7 +41,6 @@ class MainActivity : AppCompatActivity() {
 
     private fun guardar() {
         if (estaCargando) return
-        // commit() en vez de apply() = guarda YA, no cuando Android quiera
         prefs().edit()
             .putBoolean("activo", switchGlobal.isChecked)
             .putBoolean("bienvenidaActiva", switchBienvenida.isChecked)
@@ -54,7 +53,6 @@ class MainActivity : AppCompatActivity() {
         MisDatos.reglas = reglas.toMutableList()
     }
 
-    // ESTO ES LO NUEVO: guarda aunque cierres sin apretar nada
     override fun onPause() {
         super.onPause()
         val estaba = estaCargando
@@ -252,34 +250,4 @@ class MainActivity : AppCompatActivity() {
         val btnAgregar = Button(this).apply {
             text = "+  Agregar nueva respuesta"
             textSize = 18f
-            setBackground(redondo(Color.parseColor("#0F9D6A"), 50f))
-            setTextColor(Color.WHITE)
-        }
-        btnAgregar.setOnClickListener { mostrarDialogoNueva() }
-        layout.addView(btnAgregar)
-        val lista = TextView(this).apply { text = "Acá van a aparecer los borradores..."; setPadding(0, 30, 0, 0) }
-        val btnVer = Button(this).apply {
-            text = "VER BORRADORES"
-            setBackground(redondo(Color.parseColor("#E0E0E0"), 40f))
-            setTextColor(Color.BLACK)
-        }
-        btnVer.setOnClickListener {
-    val guardados = getSharedPreferences("autoreply", Context.MODE_PRIVATE).getString("borradores_guardados", "")
-    lista.text = if (!guardados.isNullOrEmpty()) guardados else Borradores.lista.joinToString("\n\n")
-}
-        layout.addView(btnVer)
-        layout.addView(lista)
-        scroll.addView(layout)
-        setContentView(scroll)
-        cargar()
-        render()
-        switchGlobal.setOnCheckedChangeListener { _, _ -> guardar(); actualizarEstado() }
-        switchBienvenida.setOnCheckedChangeListener { _, _ -> guardar() }
-        // Guarda solo mientras escribis la bienvenida, sin apretar boton
-        txtBienvenida.addTextChangedListener(object : TextWatcher {
-            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
-            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
-            override fun afterTextChanged(s: Editable?) { guardar() }
-        })
-    }
-}
+            set
