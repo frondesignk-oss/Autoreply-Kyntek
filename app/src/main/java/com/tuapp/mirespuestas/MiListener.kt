@@ -1,24 +1,26 @@
 package com.tuapp.mirespuestas
 
+import android.app.RemoteInput
 import android.content.Context
 import android.content.Intent
 import android.os.Bundle
 import android.service.notification.NotificationListenerService
 import android.service.notification.StatusBarNotification
 import androidx.core.app.NotificationCompat
-import androidx.core.app.RemoteInput
 
 class MiListener : NotificationListenerService() {
+
+    private fun guardar(texto: String) {
+        val p = getSharedPreferences("autoreply", Context.MODE_PRIVATE)
+        val anterior = p.getString("borradores_guardados", "") ?: ""
+        p.edit().putString("borradores_guardados", (texto + "\n\n" + anterior).take(5000)).apply()
+        Borradores.lista.add(texto)
+    }
 
     private fun cargarReglas(): List<ReglaMessenger> {
         val p = getSharedPreferences("autoreply", Context.MODE_PRIVATE)
         val g = p.getString("reglas", "")
-        if (g.isNullOrEmpty()) {
-            return listOf(
-                ReglaMessenger("precio", "Cuesta \$2"),
-                ReglaMessenger("horario", "Estamos de lunes a viernes de 9:00 a 18:00 h.")
-            )
-        }
+        if (g.isNullOrEmpty()) return listOf(ReglaMessenger("hola", "gt"))
         val lista = mutableListOf<ReglaMessenger>()
         g.split("##").forEach {
             val partes = it.split("||")
@@ -31,79 +33,66 @@ class MiListener : NotificationListenerService() {
         if (sbn == null) return
         if (sbn.packageName != "com.facebook.orca") return
 
+        val extras = sbn.notification.extras
+        val texto = extras.getCharSequence("android.text")?.toString() ?: ""
+        val titulo = extras.getCharSequence("android.title")?.toString() ?: ""
+
+        // 1. FILTROS QUE FALTABAN
+        if (texto.isBlank()) return
+        if (sbn.isOngoing) return
+        if (titulo == "Messenger") return // es el "Buscando mensajes nuevos"
+        if (texto.contains("Buscando mensajes", ignoreCase = true)) return
+        if (texto.contains("mensajes nuevos", ignoreCase = true)) return
+
         val p = getSharedPreferences("autoreply", Context.MODE_PRIVATE)
         if (!p.getBoolean("activo", true)) return
 
-        val notification = sbn.notification
-        val extras = notification.extras
-        val texto = extras.getCharSequence("android.text")?.toString() ?: return
-        if (texto.isBlank()) return
-        if (sbn.isOngoing) return
-
-        val clave = sbn.key + "|" + texto
-        val ultimo = p.getString("ultimo_procesado", "")
-        if (clave == ultimo) return
-        p.edit().putString("ultimo_procesado", clave).apply()
-
-        val bienvenidaActiva = p.getBoolean("bienvenidaActiva", true)
-        val bienvenida = p.getString("bienvenida", "Hola! Gracias por escribirnos. ¿En qué te ayudamos?") ?: ""
         val reglas = cargarReglas()
         val textoLower = texto.lowercase()
-
-        var respuestaEncontrada: String? = null
+        var respuestaFinal: String? = null
         for (regla in reglas) {
             if (textoLower.contains(regla.pregunta.lowercase())) {
-                respuestaEncontrada = regla.respuesta
+                respuestaFinal = regla.respuesta
                 break
             }
         }
-        val respuestaFinal = respuestaEncontrada ?: if (bienvenidaActiva) bienvenida else return
+        if (respuestaFinal == null) return
 
-        val anterior = p.getString("borradores_guardados", "")
-        val nuevo = "De: ${extras.getCharSequence("android.title")}\nMensaje: $texto\nRespuesta: $respuestaFinal"
-        p.edit().putString("borradores_guardados", (nuevo + "\n\n" + anterior).take(4000)).apply()
-        Borradores.lista.add(nuevo)
+        guardar("De: $titulo\nMensaje: $texto\nRespuesta: $respuestaFinal")
 
+        // 2. BUSCAR LA ACCION DE RESPONDER DE MESSENGER
         try {
-            val listaAcciones = mutableListOf<NotificationCompat.Action>()
-
-            // Acciones normales
-            val compatNotif = NotificationCompat.Builder(this, "default").build()
-            // Usamos el WearableExtender que es donde Messenger esconde el Responder
-            val wearable = NotificationCompat.WearableExtender(notification)
-            listaAcciones.addAll(wearable.actions)
-
-            // También las acciones directas, por las dudas
-            notification.actions?.forEach { act ->
-                // Convertir la acción de Android a la de Compat para usar el mismo RemoteInput
-                val riArray = act.remoteInputs
-                if (riArray != null) {
-                    val compatInputs = riArray.map { r ->
-                        RemoteInput.Builder(r.resultKey).build()
-                    }.toTypedArray()
-                    listaAcciones.add(
-                        NotificationCompat.Action.Builder(0, act.title, act.actionIntent)
-                            .addRemoteInput(compatInputs[0])
-                            .build()
-                    )
-                }
+            val wearable = NotificationCompat.WearableExtender(sbn.notification)
+            val todasAcciones = mutableListOf<NotificationCompat.Action>()
+            todasAcciones.addAll(wearable.actions)
+            // Tambien las acciones normales
+            for (i in 0 until NotificationCompat.getActionCount(sbn.notification)) {
+                NotificationCompat.getAction(sbn.notification, i)?.let { todasAcciones.add(it) }
             }
 
-            for (action in listaAcciones) {
-                val remoteInputs = action.remoteInputs ?: continue
-                if (remoteInputs.isEmpty()) continue
+            guardar("DEBUG: Encontre ${todasAcciones.size} acciones")
+
+            for (action in todasAcciones) {
+                val inputs = action.remoteInputs ?: continue
+                if (inputs.isEmpty()) continue
+
+                guardar("DEBUG: Intento responder con accion: ${action.title}")
 
                 val intent = Intent()
                 val bundle = Bundle()
-                for (ri in remoteInputs) {
+                for (ri in inputs) {
                     bundle.putCharSequence(ri.resultKey, respuestaFinal)
                 }
-                RemoteInput.addResultsToIntent(remoteInputs, intent, bundle)
+                // ESTA ES LA LINEA CLAVE - con android.app.RemoteInput, no con el de androidx
+                RemoteInput.addResultsToIntent(inputs, intent, bundle)
+
                 action.actionIntent?.send(this, 0, intent)
-                break
+                guardar("DEBUG: ENVIADO OK a $titulo")
+                return
             }
+            guardar("DEBUG: No encontre ninguna accion con RemoteInput. Messenger no deja responder desde notificacion.")
         } catch (e: Exception) {
-            e.printStackTrace()
+            guardar("DEBUG ERROR AL ENVIAR: ${e.message}")
         }
     }
 }
