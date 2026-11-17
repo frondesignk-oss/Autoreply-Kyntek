@@ -167,7 +167,7 @@ class MainActivity : AppCompatActivity() {
             .show()
     }
 
-       private fun mostrarDialogoEditar(index: Int) {
+           private fun mostrarDialogoEditar(index: Int) {
         val lay = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(40, 20, 40, 20) }
         val etP = EditText(this).apply { setText(reglas[index].pregunta) }
         val etR = EditText(this).apply { setText(reglas[index].respuesta) }
@@ -176,14 +176,13 @@ class MainActivity : AppCompatActivity() {
         lay.addView(TextView(this).apply { text = "Respuesta que prepara:" })
         lay.addView(etR)
         AlertDialog.Builder(this)
-            .setTitle("Editar pregunta y respuesta")
+            .setTitle("Editar pregunta")
             .setView(lay)
             .setPositiveButton("Guardar") { _, _ ->
                 val p = etP.text.toString().trim()
                 val r = etR.text.toString().trim()
                 if (p.isEmpty() || r.isEmpty()) return@setPositiveButton
-                reglas[index].pregunta = p
-                reglas[index].respuesta = r
+                reglas[index] = ReglaMessenger(p, r)
                 guardar()
                 render()
             }
