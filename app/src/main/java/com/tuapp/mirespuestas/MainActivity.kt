@@ -167,13 +167,23 @@ class MainActivity : AppCompatActivity() {
             .show()
     }
 
-    private fun mostrarDialogoEditar(index: Int) {
-        val et = EditText(this).apply { setText(reglas[index].respuesta) }
+       private fun mostrarDialogoEditar(index: Int) {
+        val lay = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(40, 20, 40, 20) }
+        val etP = EditText(this).apply { setText(reglas[index].pregunta) }
+        val etR = EditText(this).apply { setText(reglas[index].respuesta) }
+        lay.addView(TextView(this).apply { text = "Palabra que detecta:" })
+        lay.addView(etP)
+        lay.addView(TextView(this).apply { text = "Respuesta que prepara:" })
+        lay.addView(etR)
         AlertDialog.Builder(this)
-            .setTitle("Editar: " + reglas[index].pregunta)
-            .setView(et)
+            .setTitle("Editar pregunta y respuesta")
+            .setView(lay)
             .setPositiveButton("Guardar") { _, _ ->
-                reglas[index].respuesta = et.text.toString()
+                val p = etP.text.toString().trim()
+                val r = etR.text.toString().trim()
+                if (p.isEmpty() || r.isEmpty()) return@setPositiveButton
+                reglas[index].pregunta = p
+                reglas[index].respuesta = r
                 guardar()
                 render()
             }
