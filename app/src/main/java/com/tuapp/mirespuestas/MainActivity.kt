@@ -171,7 +171,7 @@ class MainActivity : AppCompatActivity() {
         val lay = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(40, 20, 40, 20) }
         val etP = EditText(this).apply { setText(reglas[index].pregunta) }
         val etR = EditText(this).apply { setText(reglas[index].respuesta) }
-        lay.addView(TextView(this).apply { text = "Palabra que detecta:" })
+        lay.addView(TextView(this).apply { text = "Palabra que detecta: Agregar , para varias palabras" })
         lay.addView(etP)
         lay.addView(TextView(this).apply { text = "Respuesta que prepara:" })
         lay.addView(etR)
